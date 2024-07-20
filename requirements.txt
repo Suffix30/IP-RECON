@@ -1,0 +1,14 @@
+customtkinter
+traceroute
+nmap
+whois
+dnsutils
+netcat
+curl
+sslscan
+openssl
+whatweb
+nikto
+gobuster
+enum4linux
+metasploit-framework
