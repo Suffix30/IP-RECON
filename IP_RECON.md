@@ -52,7 +52,7 @@ pip install customtkinter
 ```
 project_root/
 ├── ip_recon.sh         # Terminal-based network scanning script
-├── ip_recon.py         # GUI-based network scanning script
+├── ip_recon_gui.py         # GUI-based network scanning script
 ├── requirements.txt    # List of Python dependencies
 └── README.md           # Documentation
 ```
@@ -87,7 +87,7 @@ project_root/
 
 1. **Run the GUI script:**
    ```bash
-   python3 ip_recon.py
+   python3 ip_recon_gui.py
    ```
 
 2. **Input details in the GUI**:
