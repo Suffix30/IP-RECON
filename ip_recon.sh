@@ -1,15 +1,15 @@
 #!/bin/bash
 
-IP="${1:-127.0.0.1}"  # Default IP
-PORT="${2:-80}"  # Default Port
-URL="${3:-https://example.com}"  # Default URL
+IP="${1:-127.0.0.1}"
+PORT="${2:-80}"
+URL="${3:-https://example.com}"
 BASE_DIR="$HOME/Documents"
 RESULTS_DIR="$BASE_DIR/ip_recon_results"
 IP_SCAN_DIR="$RESULTS_DIR/ip_scan"
 URL_SCAN_DIR="$RESULTS_DIR/url_scan"
-WORDLIST="${4:-/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt}"  # Default Wordlist
-METASPLOIT_OPTIONS="${5:-use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;}"  # Default Metasploit Options
-NMAP_OPTIONS="${6:-}"  # Default Nmap Options
+WORDLIST="${4:-/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt}"
+METASPLOIT_OPTIONS="${5:-use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;}"
+NMAP_OPTIONS="${6:-}"
 
 echo "BASE_DIR: $BASE_DIR"
 echo "RESULTS_DIR: $RESULTS_DIR"
