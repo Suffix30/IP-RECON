@@ -16,17 +16,17 @@ def run_script():
     nmap_options = nmap_entry.get().strip()
 
     if not ip:
-        ip = "127.0.0.1"  # Default IP
+        ip = "127.0.0.1"
     if not port:
-        port = "80"  # Default Port
+        port = "80"
     if not url:
-        url = "https://example.com"  # Default URL
+        url = "https://example.com" 
     if not wordlist:
-        wordlist = "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"  # Default Wordlist
+        wordlist = "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
     if not metasploit_options:
-        metasploit_options = "use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;"  # Default Metasploit Options
+        metasploit_options = "use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;" 
     if not nmap_options:
-        nmap_options = ""  # Default Nmap Options
+        nmap_options = "" 
 
     script_content = f"""
 #!/bin/bash
