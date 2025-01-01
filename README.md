@@ -1,345 +1,158 @@
-# IP-RECON
 
-# Network Scanning Script
+# IP Recon Tool
 
-This script runs various network scanning tools against a specified IP, port, and URL. The results of each scan are saved in a `results` directory within the `Documents` folder on Kali Linux.
+## Overview
+
+The **IP Recon Tool** is a versatile network reconnaissance utility that combines various tools and scanning techniques to analyze an IP address, port, or URL. Results are organized in a structured directory, making it easy to review the findings. This tool supports both **terminal-based** and **GUI-based** operations for enhanced usability.
+
+---
+
+## Features
+
+- **Terminal Script**: Execute network scans directly from the command line with detailed output.
+- **GUI Interface**: Provides a user-friendly interface for initiating scans with customizable inputs.
+- **Comprehensive Scanning**:
+  - Ping, traceroute, and port scanning.
+  - SSL certificate checks and SMB enumeration.
+  - Web reconnaissance with WhatWeb, Nikto, and Gobuster.
+  - Exploitation preparation using Metasploit auxiliary scanners.
+- **Result Organization**: All results are saved in a structured directory under `~/Documents/ip_recon_results`.
+
+---
 
 ## Requirements
 
-Install the following tools before running the script:
+Before running the tool, ensure the following dependencies are installed:
 
-- traceroute
-- nmap
-- whois
-- nslookup
-- netcat
-- curl
-- sslscan
-- openssl
-- whatweb
-- nikto
-- gobuster
-- enum4linux
-- metasploit-framework
+### Required Tools
 
-### Installing Requirements
+- **Command-line utilities**: `traceroute`, `nmap`, `whois`, `nslookup`, `netcat`, `curl`, `openssl`
+- **Web analysis tools**: `sslscan`, `whatweb`, `nikto`, `gobuster`
+- **SMB enumeration tool**: `enum4linux`
+- **Exploitation framework**: `metasploit-framework`
 
-On a Debian-based system, you can install the tools with the following command:
+### Install Dependencies
+
+On Debian-based systems (e.g., Kali Linux):
 
 ```bash
 sudo apt-get install traceroute nmap whois dnsutils netcat curl sslscan openssl whatweb nikto gobuster enum4linux metasploit-framework
 ```
 
-## Script
-
-Save the following script as `ip_recon.sh`:
+For Python dependencies (GUI version):
 
 ```bash
-#!/bin/bash
-
-IP="${1:-127.0.0.1}"  # Default IP
-PORT="${2:-80}"  # Default Port
-URL="${3:-https://example.com}"  # Default URL
-BASE_DIR="$HOME/Documents"
-RESULTS_DIR="$BASE_DIR/ip_recon_results"
-IP_SCAN_DIR="$RESULTS_DIR/ip_scan"
-URL_SCAN_DIR="$RESULTS_DIR/url_scan"
-WORDLIST="${4:-/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt}"  # Default Wordlist
-METASPLOIT_OPTIONS="${5:-use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;}"  # Default Metasploit Options
-NMAP_OPTIONS="${6:-}"  # Default Nmap Options
-
-echo "BASE_DIR: $BASE_DIR"
-echo "RESULTS_DIR: $RESULTS_DIR"
-echo "IP_SCAN_DIR: $IP_SCAN_DIR"
-echo "URL_SCAN_DIR: $URL_SCAN_DIR"
-
-mkdir -p "$IP_SCAN_DIR"
-mkdir -p "$URL_SCAN_DIR"
-
-if [ -d "$IP_SCAN_DIR" ] && [ -d "$URL_SCAN_DIR" ]; then
-  echo "㉿ Directories $IP_SCAN_DIR and $URL_SCAN_DIR created successfully.㉿"
-else
-  echo "㉿ Failed to create directories $IP_SCAN_DIR and $URL_SCAN_DIR.㉿"
-  exit 1
-fi
-
-if [ -n "$IP" ] && [ -n "$PORT" ]; then
-  echo "[*] ㉿ Pinging $IP..."
-  ping -c 10 $IP > "$IP_SCAN_DIR/ping_results.txt"
-
-  echo "[*] ㉿ Running traceroute to $IP..."
-  sudo traceroute -T $IP > "$IP_SCAN_DIR/traceroute_results.txt" 2>&1
-
-  echo "[*] ㉿ Scanning $IP with nmap..."
-  sudo nmap -A -T4 -p $PORT $NMAP_OPTIONS $IP > "$IP_SCAN_DIR/nmap_results.txt"
-
-  echo "[*] ㉿ Running whois on $IP..."
-  whois $IP > "$IP_SCAN_DIR/whois_results.txt"
-
-  echo "[*] ㉿ Running nslookup on $IP..."
-  nslookup $IP > "$IP_SCAN_DIR/nslookup_results.txt"
-
-  echo "[*] ㉿ Checking port $PORT with netcat..."
-  echo -e "GET / HTTP/1.1\\nHost: $IP\\n\\n" | nc -v $IP $PORT > "$IP_SCAN_DIR/nc_results.txt" 2>&1
-
-  echo "[*] ㉿ Running SSL scan on $IP:$PORT..."
-  sslscan --no-failed $IP:$PORT > "$IP_SCAN_DIR/sslscan_results.txt"
-
-  echo "[*] ㉿ Running OpenSSL s_client to check SSL certificates..."
-  echo | openssl s_client -connect $IP:$PORT > "$IP_SCAN_DIR/openssl_results.txt" 2>&1
-
-  echo "[*] ㉿ Running Enum4Linux for SMB enumeration on $IP..."
-  if command -v enum4linux &> /dev/null
-  then
-      enum4linux -a $IP > "$IP_SCAN_DIR/enum4linux_results.txt"
-  else
-      echo "Enum4Linux is not installed. Skipping Enum4Linux scan."
-  fi
-
-  echo "[*] ㉿ Running Metasploit auxiliary scanners on $IP..."
-  msfconsole -q -x "use auxiliary/scanner/portscan/tcp; set RHOSTS $IP; run; $METASPLOIT_OPTIONS exit" > "$IP_SCAN_DIR/metasploit_results.txt"
-fi
-
-if [ -n "$URL" ]; then
-  echo "[*] ㉿ Running WhatWeb to identify technologies used on $URL..."
-  whatweb --no-errors -a 3 $URL > "$URL_SCAN_DIR/whatweb_results.txt"
-
-  echo "[*] ㉿ Running Nikto to check for web vulnerabilities on $URL..."
-  nikto -h $URL > "$URL_SCAN_DIR/nikto_results.txt"
-
-  echo "[*] ㉿ Running Gobuster to discover directories and files on $URL..."
-  if command -v gobuster &> /dev/null
-  then
-      gobuster dir -u $URL -w $WORDLIST -k -o "$URL_SCAN_DIR/gobuster_results.txt"
-  else
-      echo "㉿㉿㉿ Gobuster is not installed. Skipping Gobuster scan.㉿㉿㉿"
-  fi
-
-  echo "[*] ㉿ Running curl to check HTTPS response for $URL..."
-  curl -I -k -v $URL > "$URL_SCAN_DIR/curl_results.txt" 2>&1
-fi
-
-echo "[*] ㉿ Reconnaissance completed. Results saved in $RESULTS_DIR"
+pip install customtkinter
 ```
 
+---
+
+## Folder Structure
+
+```
+project_root/
+├── ip_recon.sh         # Terminal-based network scanning script
+├── ip_recon_gui.py     # GUI-based network scanning script
+├── requirements.txt    # List of Python dependencies
+└── README.md           # Documentation
+```
+
+---
+
 ## Usage
+
+### Terminal Version
 
 1. **Make the script executable:**
+   ```bash
+   chmod +x ip_recon.sh
+   ```
 
-    ```bash
-    chmod +x ip_recon.sh
-    ```
+2. **Run the script:**
+   - **Default values:**
+     The script will use `127.0.0.1` as the IP, `80` as the port, and `https://example.com` as the URL:
+     ```bash
+     sudo ./ip_recon.sh
+     ```
+   - **Custom values:**
+     ```bash
+     sudo ./ip_recon.sh <IP> <PORT> <URL> <WORDLIST_PATH> <METASPLOIT_OPTIONS> <NMAP_OPTIONS>
+     ```
+     **Example:**
+     ```bash
+     sudo ./ip_recon.sh 192.168.1.1 443 https://target.com /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt "use auxiliary/scanner/ftp/ftp_version; set RHOSTS 192.168.1.1; run;" "-Pn"
+     ```
+     **Explanation of example:**
+     - `192.168.1.1`: Target IP address.
+     - `443`: HTTPS port.
+     - `https://target.com`: URL for web scanning.
+     - `/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt`: Wordlist for Gobuster.
+     - `use auxiliary/scanner/ftp/ftp_version; set RHOSTS 192.168.1.1; run;`: Metasploit FTP scanner.
+     - `-Pn`: Nmap option to skip host discovery.
 
-2. **Run the script with default values:**
+3. **Output**: Results are saved in the directory:
+   ```
+   ~/Documents/ip_recon_results/
+   ```
 
-    ```bash
-    sudo ./ip_recon.sh
-    ```
+   Example of a results directory:
+   ```
+   ip_recon_results/
+   ├── ip_scan/
+   │   ├── ping_results.txt
+   │   ├── traceroute_results.txt
+   │   ├── nmap_results.txt
+   │   ├── whois_results.txt
+   │   ├── nslookup_results.txt
+   │   ├── nc_results.txt
+   │   ├── sslscan_results.txt
+   │   ├── openssl_results.txt
+   │   ├── enum4linux_results.txt
+   │   └── metasploit_results.txt
+   └── url_scan/
+       ├── whatweb_results.txt
+       ├── nikto_results.txt
+       ├── gobuster_results.txt
+       └── curl_results.txt
+   ```
 
-3. **Run the script with custom values:**
-
-    ```bash
-    sudo ./ip_recon.sh <IP> <PORT> <URL> <WORDLIST_PATH> <METASPLOIT_OPTIONS> <NMAP_OPTIONS>
-    ```
-
-## Folder Structure
-
-```
-project_root/
-├── ip_recon.sh
-└── requirements.txt
-```
-
-## GUI Script
-
-You can also use a GUI tool to run this script. Save the following script as `ip_recon.py`:
-
-```python
-import os
-import subprocess
-import threading
-import customtkinter as ctk
-
-running_process = None
-
-def run_script():
-    global running_process
-
-    ip = ip_entry.get().strip()
-    port = port_entry.get().strip()
-    url = url_entry.get().strip()
-    wordlist = wordlist_entry.get().strip()
-    metasploit_options = metasploit_entry.get().strip()
-    nmap_options = nmap_entry.get().strip()
-
-    if not ip:
-        ip = "127.0.0.1"  # Default IP
-    if not port:
-        port = "80"  # Default Port
-    if not url:
-        url = "https://example.com"  # Default URL
-    if not wordlist:
-        wordlist = "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"  # Default Wordlist
-    if not metasploit_options:
-        metasploit_options = "use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;"  # Default Metasploit Options
-    if not nmap_options:
-        nmap_options = ""  # Default Nmap Options
-
-    script_content = f"""
-#!/bin/bash
-
-IP="{ip}"
-PORT="{port}"
-URL="{url}"
-BASE_DIR="/home/kali/Documents"
-RESULTS_DIR="$BASE_DIR/ip_recon_results"
-IP_SCAN_DIR="$RESULTS_DIR/ip_scan"
-URL_SCAN_DIR="$RESULTS_DIR/url_scan"
-WORDLIST="{wordlist}"
-METASPLOIT_OPTIONS="{metasploit_options}"
-NMAP_OPTIONS="{nmap_options}"
-
-echo "BASE_DIR: $BASE_DIR"
-echo "RESULTS_DIR: $RESULTS_DIR"
-echo "IP_SCAN_DIR: $IP_SCAN_DIR"
-echo "URL_SCAN_DIR: $URL_SCAN_DIR"
-
-mkdir -p "$IP_SCAN_DIR"
-mkdir -p "$URL_SCAN_DIR"
-
-if [ -d "$IP_SCAN_DIR" ] && [ -d "$URL_SCAN_DIR" ]; then
-  echo "㉿ Directories $IP_SCAN_DIR and $URL_SCAN_DIR created successfully.㉿"
-else
-  echo "㉿ Failed to create directories $IP_SCAN_DIR and $URL_SCAN_DIR.㉿"
-  exit 1
-fi
-
-if [ -n "$IP" ] && [ -n "$PORT" ]; then
-  echo "[*] ㉿ Pinging $IP..."
-  ping -c 10 $IP > "$IP_SCAN_DIR/ping_results.txt"
-
-  echo "[*] ㉿ Running traceroute to $IP..."
-  sudo traceroute -T $IP > "$IP_SCAN_DIR/traceroute_results.txt" 2>&1
-
-  echo "[*] ㉿ Scanning $IP with nmap..."
-  sudo nmap -A -T4 -p $PORT $NMAP_OPTIONS $IP > "$IP_SCAN_DIR/nmap_results.txt"
-
-  echo "[*] ㉿ Running whois on $IP..."
-  whois $IP > "$IP_SCAN_DIR/whois_results.txt"
-
-  echo "[*] ㉿ Running nslookup on $IP..."
-  nslookup $IP > "$IP_SCAN_DIR/nslookup_results.txt"
-
-  echo "[*] ㉿ Checking port $PORT with netcat..."
-  echo -e "GET / HTTP/1.1\\nHost: $IP\\n\\n" | nc -v $IP $PORT > "$IP_SCAN_DIR/nc_results.txt" 2>&1
-
-  echo "[*] ㉿ Running SSL scan on $IP:$PORT..."
-  sslscan --no-failed $IP:$PORT > "$IP_SCAN_DIR/sslscan_results.txt"
-
-  echo "[*] ㉿ Running OpenSSL s_client to check SSL certificates..."
-  echo | openssl s_client -connect $IP:$PORT > "$IP_SCAN_DIR/openssl_results.txt" 2>&1
-
-  echo "[*] ㉿ Running Enum4Linux for SMB enumeration on $IP..."
-  if command -v enum4linux &> /dev/null
-  then
-      enum4linux -a $IP > "$IP_SCAN_DIR/enum4linux_results.txt"
-  else
-      echo "Enum4Linux is not installed. Skipping Enum4Linux scan."
-  fi
-
-  echo "[*] ㉿ Running Metasploit auxiliary scanners on $IP..."
-  msfconsole -q -x "use auxiliary/scanner/portscan/tcp; set RHOSTS $IP; run; $METASPLOIT_OPTIONS exit" > "$IP_SCAN_DIR/metasploit_results.txt"
-fi
-
-if [ -n "$URL" ]; then
-  echo "[*] ㉿ Running WhatWeb to identify technologies used on $URL..."
-  whatweb --no-errors -a 3 $URL > "$URL_SCAN_DIR/whatweb_results.txt"
-
-  echo "[*] ㉿ Running Nikto to check for web vulnerabilities on $URL..."
-  nikto -h $URL > "$URL_SCAN_DIR/nikto_results.txt"
-
-  echo "[*] ㉿ Running Gobuster to discover directories and files on $URL..."
-  if command -v gobuster &> /dev/null
-  then
-      gobuster dir -u $URL -w $WORDLIST -k -o "$URL_SCAN_DIR/gobuster_results.txt"
-  else
-      echo "㉿㉿㉿ Gobuster is not installed. Skipping Gobuster scan.㉿㉿㉿"
-  fi
-
-  echo "[*] ㉿ Running curl to check HTTPS response for $URL..."
-  curl -I -k -v $URL > "$URL_SCAN_DIR/curl_results.txt" 2>&1
-fi
-
-echo "[*] ㉿ Reconnaissance completed. Results saved in $RESULTS_DIR"
-"""
-
-    script_path = "/home/kali/Documents/ip_recon.sh"
-    with open(script_path, 'w') as file:
-        file.write(script_content)
-
-    subprocess.run(["chmod", "+x", script_path])
-    
-    running_process = subprocess.Popen(["sudo", script_path])
-
-def stop_script():
-    global running_process
-    if running_process:
-        running_process.terminate()
-        running_process = None
-        print("Script execution stopped.")
-
-app = ctk.CTk()
-
-app.title("IP Recon")
-app.geometry("400x500")
-
-ctk.CTkLabel(app, text="IP Recon Tool").pack(pady=10)
-
-ctk.CTkLabel(app, text="IP Address").pack()
-ip_entry = ctk.CTkEntry(app)
-ip_entry.pack()
-
-ctk.CTkLabel(app, text="Port").pack()
-port_entry = ctk.CTkEntry(app)
-port_entry.pack()
-
-ctk.CTkLabel(app, text="URL").pack()
-url_entry = ctk.CTkEntry(app)
-url_entry.pack()
-
-ctk.CTkLabel(app, text="Word List Path").pack()
-wordlist_entry = ctk.CTkEntry(app)
-wordlist_entry.pack()
-
-ctk.CTkLabel(app, text="Metasploit Options").pack()
-metasploit_entry = ctk.CTkEntry(app)
-metasploit_entry.pack()
-
-ctk.CTkLabel(app, text="Nmap Options").pack()
-nmap_entry = ctk.CTkEntry(app)
-nmap_entry.pack()
-
-ctk.CTkButton(app, text="Run Script", command=lambda: threading.Thread(target=run_script).start()).pack(pady=10)
-ctk.CTkButton(app, text="Stop Script", command=stop_script).pack(pady=10)
-
-app.mainloop()
-```
-
-## Usage
+### GUI Version
 
 1. **Run the GUI script:**
+   ```bash
+   python3 ip_recon_gui.py
+   ```
 
-    ```bash
-    python3 ip_recon.py
-    ```
+2. **Input details in the GUI:**
+   - **IP Address**: Example: `192.168.1.1`
+   - **Port**: Example: `443`
+   - **URL**: Example: `https://target.com`
+   - **Wordlist Path**: Browse and select, e.g., `/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt`.
+   - **Metasploit Options**: Example: `use auxiliary/scanner/ftp/ftp_version; set RHOSTS 192.168.1.1; run;`.
+   - **Nmap Options**: Example: `-Pn`.
 
-2. **Input the necessary details in the GUI and run the script.**
+3. **Run or Stop:**
+   - Click **Run Script** to start the scan.
+   - Use **Stop Script** to terminate the scan.
 
-## Folder Structure
+---
 
-```
-project_root/
-├── ip_recon.sh
-├── ip_recon.py
-└── requirements.txt
-```
+## Features in the GUI Version
+
+### Real-Time Monitoring
+- The GUI dynamically updates log outputs while scans are running.
+
+### Error Handling
+- Missing tools or invalid inputs trigger error messages.
+
+### Customizable Scans
+- Users can easily specify custom inputs, such as:
+  - Target IP or URL.
+  - Wordlist file.
+  - Specific Metasploit and Nmap options.
+
+---
+
+## Contribution
+
+Contributions and feedback are welcome. To suggest improvements or report issues, submit a pull request or open an issue in the repository.
