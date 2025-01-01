@@ -2,8 +2,27 @@ import os
 import subprocess
 import threading
 import customtkinter as ctk
+from tkinter import filedialog, messagebox
 
 running_process = None
+
+def validate_inputs(ip, port, url, wordlist):
+    if not ip or not port or not url or not wordlist:
+        messagebox.showerror("Error", "All fields must be filled.")
+        return False
+    if not port.isdigit():
+        messagebox.showerror("Error", "Port must be a number.")
+        return False
+    if not os.path.isfile(wordlist):
+        messagebox.showerror("Error", "Invalid wordlist path.")
+        return False
+    return True
+
+def browse_wordlist():
+    wordlist_path = filedialog.askopenfilename(title="Select Wordlist", filetypes=[("Text Files", "*.txt")])
+    if wordlist_path:
+        wordlist_entry.delete(0, "end")
+        wordlist_entry.insert(0, wordlist_path)
 
 def run_script():
     global running_process
@@ -15,128 +34,73 @@ def run_script():
     metasploit_options = metasploit_entry.get().strip()
     nmap_options = nmap_entry.get().strip()
 
-    if not ip:
-        ip = "127.0.0.1"
-    if not port:
-        port = "80"
-    if not url:
-        url = "https://example.com" 
-    if not wordlist:
-        wordlist = "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
-    if not metasploit_options:
-        metasploit_options = "use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;" 
-    if not nmap_options:
-        nmap_options = "" 
+    if not validate_inputs(ip, port, url, wordlist):
+        return
 
     script_content = f"""
 #!/bin/bash
-
 IP="{ip}"
 PORT="{port}"
 URL="{url}"
-BASE_DIR="/home/kali/Documents"
+BASE_DIR="$HOME/Documents"
 RESULTS_DIR="$BASE_DIR/ip_recon_results"
 IP_SCAN_DIR="$RESULTS_DIR/ip_scan"
 URL_SCAN_DIR="$RESULTS_DIR/url_scan"
 WORDLIST="{wordlist}"
-METASPLOIT_OPTIONS="{metasploit_options}"
-NMAP_OPTIONS="{nmap_options}"
-
-echo "BASE_DIR: $BASE_DIR"
-echo "RESULTS_DIR: $RESULTS_DIR"
-echo "IP_SCAN_DIR: $IP_SCAN_DIR"
-echo "URL_SCAN_DIR: $URL_SCAN_DIR"
+METASPLOIT_OPTIONS="{metasploit_options or 'use auxiliary/scanner/ftp/ftp_version; set RHOSTS $IP; run;'}"
+NMAP_OPTIONS="{nmap_options or ''}"
 
 mkdir -p "$IP_SCAN_DIR"
 mkdir -p "$URL_SCAN_DIR"
 
-if [ -d "$IP_SCAN_DIR" ] && [ -d "$URL_SCAN_DIR" ]; then
-  echo "㉿ Directories $IP_SCAN_DIR and $URL_SCAN_DIR created successfully.㉿"
+echo "Starting IP Recon..."
+ping -c 10 $IP > "$IP_SCAN_DIR/ping_results.txt"
+sudo traceroute -T $IP > "$IP_SCAN_DIR/traceroute_results.txt" 2>&1
+sudo nmap -A -T4 -p $PORT $NMAP_OPTIONS $IP > "$IP_SCAN_DIR/nmap_results.txt"
+whois $IP > "$IP_SCAN_DIR/whois_results.txt"
+nslookup $IP > "$IP_SCAN_DIR/nslookup_results.txt"
+echo -e "GET / HTTP/1.1\\nHost: $IP\\n\\n" | nc -v $IP $PORT > "$IP_SCAN_DIR/nc_results.txt" 2>&1
+sslscan --no-failed $IP:$PORT > "$IP_SCAN_DIR/sslscan_results.txt"
+echo | openssl s_client -connect $IP:$PORT > "$IP_SCAN_DIR/openssl_results.txt" 2>&1
+whatweb --no-errors -a 3 $URL > "$URL_SCAN_DIR/whatweb_results.txt"
+nikto -h $URL > "$URL_SCAN_DIR/nikto_results.txt"
+if command -v gobuster &> /dev/null; then
+    gobuster dir -u $URL -w $WORDLIST -k -o "$URL_SCAN_DIR/gobuster_results.txt"
 else
-  echo "㉿ Failed to create directories $IP_SCAN_DIR and $URL_SCAN_DIR.㉿"
-  exit 1
+    echo "Gobuster is not installed. Skipping."
 fi
-
-if [ -n "$IP" ] && [ -n "$PORT" ]; then
-  echo "[*] ㉿ Pinging $IP..."
-  ping -c 10 $IP > "$IP_SCAN_DIR/ping_results.txt"
-
-  echo "[*] ㉿ Running traceroute to $IP..."
-  sudo traceroute -T $IP > "$IP_SCAN_DIR/traceroute_results.txt" 2>&1
-
-  echo "[*] ㉿ Scanning $IP with nmap..."
-  sudo nmap -A -T4 -p $PORT $NMAP_OPTIONS $IP > "$IP_SCAN_DIR/nmap_results.txt"
-
-  echo "[*] ㉿ Running whois on $IP..."
-  whois $IP > "$IP_SCAN_DIR/whois_results.txt"
-
-  echo "[*] ㉿ Running nslookup on $IP..."
-  nslookup $IP > "$IP_SCAN_DIR/nslookup_results.txt"
-
-  echo "[*] ㉿ Checking port $PORT with netcat..."
-  echo -e "GET / HTTP/1.1\\nHost: $IP\\n\\n" | nc -v $IP $PORT > "$IP_SCAN_DIR/nc_results.txt" 2>&1
-
-  echo "[*] ㉿ Running SSL scan on $IP:$PORT..."
-  sslscan --no-failed $IP:$PORT > "$IP_SCAN_DIR/sslscan_results.txt"
-
-  echo "[*] ㉿ Running OpenSSL s_client to check SSL certificates..."
-  echo | openssl s_client -connect $IP:$PORT > "$IP_SCAN_DIR/openssl_results.txt" 2>&1
-
-  echo "[*] ㉿ Running Enum4Linux for SMB enumeration on $IP..."
-  if command -v enum4linux &> /dev/null
-  then
-      enum4linux -a $IP > "$IP_SCAN_DIR/enum4linux_results.txt"
-  else
-      echo "Enum4Linux is not installed. Skipping Enum4Linux scan."
-  fi
-
-  echo "[*] ㉿ Running Metasploit auxiliary scanners on $IP..."
-  msfconsole -q -x "use auxiliary/scanner/portscan/tcp; set RHOSTS $IP; run; $METASPLOIT_OPTIONS exit" > "$IP_SCAN_DIR/metasploit_results.txt"
-fi
-
-if [ -n "$URL" ]; then
-  echo "[*] ㉿ Running WhatWeb to identify technologies used on $URL..."
-  whatweb --no-errors -a 3 $URL > "$URL_SCAN_DIR/whatweb_results.txt"
-
-  echo "[*] ㉿ Running Nikto to check for web vulnerabilities on $URL..."
-  nikto -h $URL > "$URL_SCAN_DIR/nikto_results.txt"
-
-  echo "[*] ㉿ Running Gobuster to discover directories and files on $URL..."
-  if command -v gobuster &> /dev/null
-  then
-      gobuster dir -u $URL -w $WORDLIST -k -o "$URL_SCAN_DIR/gobuster_results.txt"
-  else
-      echo "㉿㉿㉿ Gobuster is not installed. Skipping Gobuster scan.㉿㉿㉿"
-  fi
-
-  echo "[*] ㉿ Running curl to check HTTPS response for $URL..."
-  curl -I -k -v $URL > "$URL_SCAN_DIR/curl_results.txt" 2>&1
-fi
-
-echo "[*] ㉿ Reconnaissance completed. Results saved in $RESULTS_DIR"
+echo "Recon completed. Results saved in $RESULTS_DIR"
 """
-
-    script_path = "/home/kali/Documents/ip_recon.sh"
+    script_path = os.path.expanduser("~/Documents/ip_recon.sh")
     with open(script_path, 'w') as file:
         file.write(script_content)
 
-    subprocess.run(["chmod", "+x", script_path])
-    
-    running_process = subprocess.Popen(["sudo", script_path])
+    os.chmod(script_path, 0o755)
+
+    try:
+        running_process = subprocess.Popen(["sudo", script_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        threading.Thread(target=log_output, args=(running_process.stdout,)).start()
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to execute script: {e}")
 
 def stop_script():
     global running_process
     if running_process:
         running_process.terminate()
         running_process = None
-        print("Script execution stopped.")
+        messagebox.showinfo("Info", "Script execution stopped.")
+
+def log_output(pipe):
+    for line in iter(pipe.readline, ''):
+        log_text.insert("end", line)
+        log_text.see("end")
+    pipe.close()
 
 app = ctk.CTk()
-
 app.title("IP Recon")
-app.geometry("400x500")
+app.geometry("500x600")
 
-ctk.CTkLabel(app, text="IP Recon Tool").pack(pady=10)
+ctk.CTkLabel(app, text="IP Recon Tool", font=("Helvetica", 16)).pack(pady=10)
 
 ctk.CTkLabel(app, text="IP Address").pack()
 ip_entry = ctk.CTkEntry(app)
@@ -153,6 +117,7 @@ url_entry.pack()
 ctk.CTkLabel(app, text="Word List Path").pack()
 wordlist_entry = ctk.CTkEntry(app)
 wordlist_entry.pack()
+ctk.CTkButton(app, text="Browse", command=browse_wordlist).pack(pady=5)
 
 ctk.CTkLabel(app, text="Metasploit Options").pack()
 metasploit_entry = ctk.CTkEntry(app)
@@ -164,5 +129,8 @@ nmap_entry.pack()
 
 ctk.CTkButton(app, text="Run Script", command=lambda: threading.Thread(target=run_script).start()).pack(pady=10)
 ctk.CTkButton(app, text="Stop Script", command=stop_script).pack(pady=10)
+
+log_text = ctk.CTkTextbox(app, height=200, width=450)
+log_text.pack(pady=10)
 
 app.mainloop()
