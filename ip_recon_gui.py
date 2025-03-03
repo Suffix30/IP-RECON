@@ -1,6 +1,7 @@
 import os
 import subprocess
 import threading
+import tempfile
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 
@@ -18,25 +19,17 @@ def validate_inputs(ip, port, url, wordlist):
         return False
     return True
 
+def check_tool_installed(tool):
+    return subprocess.run(['which', tool], capture_output=True, text=True).returncode == 0
+
 def browse_wordlist():
     wordlist_path = filedialog.askopenfilename(title="Select Wordlist", filetypes=[("Text Files", "*.txt")])
     if wordlist_path:
         wordlist_entry.delete(0, "end")
         wordlist_entry.insert(0, wordlist_path)
 
-def run_script():
-    global running_process
-
-    ip = ip_entry.get().strip()
-    port = port_entry.get().strip()
-    url = url_entry.get().strip()
-    wordlist = wordlist_entry.get().strip()
-    metasploit_options = metasploit_entry.get().strip()
-    nmap_options = nmap_entry.get().strip()
-
-    if not validate_inputs(ip, port, url, wordlist):
-        return
-
+def generate_script(ip, port, url, wordlist, metasploit_options, nmap_options, scan_mode):
+    nmap_scan = "sudo nmap -sS -T2 -p $PORT $NMAP_OPTIONS $IP" if scan_mode == "stealth" else "sudo nmap -A -T4 -p $PORT $NMAP_OPTIONS $IP"
     script_content = f"""
 #!/bin/bash
 IP="{ip}"
@@ -56,7 +49,7 @@ mkdir -p "$URL_SCAN_DIR"
 echo "Starting IP Recon..."
 ping -c 10 $IP > "$IP_SCAN_DIR/ping_results.txt"
 sudo traceroute -T $IP > "$IP_SCAN_DIR/traceroute_results.txt" 2>&1
-sudo nmap -A -T4 -p $PORT $NMAP_OPTIONS $IP > "$IP_SCAN_DIR/nmap_results.txt"
+{nmap_scan} > "$IP_SCAN_DIR/nmap_results.txt"
 whois $IP > "$IP_SCAN_DIR/whois_results.txt"
 nslookup $IP > "$IP_SCAN_DIR/nslookup_results.txt"
 echo -e "GET / HTTP/1.1\\nHost: $IP\\n\\n" | nc -v $IP $PORT > "$IP_SCAN_DIR/nc_results.txt" 2>&1
@@ -71,10 +64,31 @@ else
 fi
 echo "Recon completed. Results saved in $RESULTS_DIR"
 """
-    script_path = os.path.expanduser("~/Documents/ip_recon.sh")
-    with open(script_path, 'w') as file:
-        file.write(script_content)
+    return script_content
 
+def run_script():
+    global running_process
+    ip = ip_entry.get().strip()
+    port = port_entry.get().strip()
+    url = url_entry.get().strip()
+    wordlist = wordlist_entry.get().strip()
+    metasploit_options = metasploit_entry.get().strip()
+    nmap_options = nmap_entry.get().strip()
+    scan_mode = scan_mode_combo.get()
+
+    if not validate_inputs(ip, port, url, wordlist):
+        return
+
+    required_tools = ['nmap', 'traceroute', 'whois', 'nc', 'sslscan', 'openssl', 'whatweb', 'nikto', 'gobuster']
+    missing_tools = [tool for tool in required_tools if not check_tool_installed(tool)]
+    if missing_tools:
+        messagebox.showerror("Error", f"Missing tools: {', '.join(missing_tools)}. Please install them.")
+        return
+
+    script_content = generate_script(ip, port, url, wordlist, metasploit_options, nmap_options, scan_mode)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as temp_file:
+        temp_file.write(script_content)
+        script_path = temp_file.name
     os.chmod(script_path, 0o755)
 
     try:
@@ -82,6 +96,8 @@ echo "Recon completed. Results saved in $RESULTS_DIR"
         threading.Thread(target=log_output, args=(running_process.stdout,)).start()
     except Exception as e:
         messagebox.showerror("Error", f"Failed to execute script: {e}")
+    finally:
+        os.unlink(script_path)
 
 def stop_script():
     global running_process
@@ -92,13 +108,18 @@ def stop_script():
 
 def log_output(pipe):
     for line in iter(pipe.readline, ''):
+        if "nmap" in line.lower():
+            status_label.configure(text="Status: Running Nmap...")
+        elif "nikto" in line.lower():
+            status_label.configure(text="Status: Running Nikto...")
         log_text.insert("end", line)
         log_text.see("end")
+    status_label.configure(text="Status: Idle")
     pipe.close()
 
 app = ctk.CTk()
 app.title("IP Recon")
-app.geometry("500x600")
+app.geometry("500x650")
 
 ctk.CTkLabel(app, text="IP Recon Tool", font=("Helvetica", 16)).pack(pady=10)
 
@@ -127,8 +148,15 @@ ctk.CTkLabel(app, text="Nmap Options").pack()
 nmap_entry = ctk.CTkEntry(app)
 nmap_entry.pack()
 
+ctk.CTkLabel(app, text="Scan Mode").pack()
+scan_mode_combo = ctk.CTkComboBox(app, values=["aggressive", "stealth"])
+scan_mode_combo.pack(pady=5)
+
 ctk.CTkButton(app, text="Run Script", command=lambda: threading.Thread(target=run_script).start()).pack(pady=10)
 ctk.CTkButton(app, text="Stop Script", command=stop_script).pack(pady=10)
+
+status_label = ctk.CTkLabel(app, text="Status: Idle")
+status_label.pack(pady=5)
 
 log_text = ctk.CTkTextbox(app, height=200, width=450)
 log_text.pack(pady=10)
